@@ -22,7 +22,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/security/config"
 	sprobe "github.com/DataDog/datadog-agent/pkg/security/probe"
 	"github.com/DataDog/datadog-agent/pkg/security/rules"
-	"github.com/DataDog/datadog-agent/pkg/security/secl/eval"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 )
 
@@ -67,8 +66,20 @@ LOOP:
 	return nil
 }
 
+// Event is the interface that an event must implement to be sent to the backend
+type Event interface {
+	GetTags() []string
+	GetType() string
+}
+
+// RuleEvent is a wrapper used to send an event to the backend
+type RuleEvent struct {
+	RuleID string `json:"rule_id"`
+	Event  Event `json:"event"`
+}
+
 // SendEvent forwards events sent by the runtime security module to Datadog
-func (e *EventServer) SendEvent(rule *rules.Rule, event eval.Event) {
+func (e *EventServer) SendEvent(rule *rules.Rule, event Event) {
 	agentContext := &AgentContext{
 		RuleID: rule.Definition.ID,
 		Tags:   append(rule.Tags, "rule_id:"+rule.Definition.ID),
