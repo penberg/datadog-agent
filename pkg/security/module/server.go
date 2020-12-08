@@ -75,7 +75,7 @@ type Event interface {
 // RuleEvent is a wrapper used to send an event to the backend
 type RuleEvent struct {
 	RuleID string `json:"rule_id"`
-	Event  Event `json:"event"`
+	Event  Event  `json:"event"`
 }
 
 // SendEvent forwards events sent by the runtime security module to Datadog

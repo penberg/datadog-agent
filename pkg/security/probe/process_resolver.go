@@ -68,7 +68,7 @@ type ProcessResolver struct {
 	sync.RWMutex
 	probe                 *Probe
 	resolvers             *Resolvers
-	client         *statsd.Client
+	client                *statsd.Client
 	snapshotProbes        []*manager.Probe
 	inodeInfoMap          *lib.Map
 	procCacheMap          *lib.Map
@@ -378,14 +378,11 @@ func (p *ProcessResolver) resolveWithProcfs(pid uint32) *ProcessCacheEntry {
 	return entry
 }
 
+// Get returns the cache entry for a specified pid
 func (p *ProcessResolver) Get(pid uint32) *ProcessCacheEntry {
 	p.RLock()
 	defer p.RUnlock()
-	entry, exists := p.entryCache[pid]
-	if exists {
-		return entry
-	}
-	return nil
+	return p.entryCache[pid]
 }
 
 // Start starts the resolver
@@ -527,7 +524,7 @@ func NewProcessResolver(probe *Probe, resolvers *Resolvers, client *statsd.Clien
 	return &ProcessResolver{
 		probe:       probe,
 		resolvers:   resolvers,
-		client:     client,
+		client:      client,
 		entryCache:  make(map[uint32]*ProcessCacheEntry),
 		cookieCache: cookieLRU,
 	}, nil
