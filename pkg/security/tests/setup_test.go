@@ -136,8 +136,7 @@ type testProbe struct {
 }
 
 type testEventHandler struct {
-	ruleSet *rules.RuleSet
-	events  chan *sprobe.Event
+	events       chan *sprobe.Event
 	customEvents chan *module.RuleEvent
 }
 
@@ -149,14 +148,14 @@ func (h *testEventHandler) HandleEvent(event *sprobe.Event) {
 	default:
 		log.Debugf("dropped probe event %+v")
 	}
-	h.ruleSet.Evaluate(event)
+	testMod.module.HandleEvent(event)
 }
 
-func (h *testEventHandler) HandleCustomEvent(rule *eval.Rule, event *sprobe.CustomEvent) {
+func (h *testEventHandler) HandleCustomEvent(rule *rules.Rule, event *sprobe.CustomEvent) {
 	e := event.Clone()
 	re := module.RuleEvent{
 		RuleID: rule.ID,
-		Event: &e,
+		Event:  &e,
 	}
 	select {
 	case h.customEvents <- &re:
@@ -236,26 +235,6 @@ func setTestPolicy(dir string, macros []*rules.MacroDefinition, rules []*rules.R
 }
 
 func newTestModule(macros []*rules.MacroDefinition, rules []*rules.RuleDefinition, opts testOpts) (*testModule, error) {
-	defer func() {
-		if testMod == nil {
-			return
-		}
-
-		if opts.wantProbeEvents {
-			ruleSet := testMod.module.GetRuleSet()
-			handler := &testEventHandler{
-				events:  make(chan *sprobe.Event, 16384),
-				customEvents: make(chan *module.RuleEvent, 16384),
-				ruleSet: ruleSet,
-			}
-			testMod.probeHandler = handler
-			testMod.probe.SetEventHandler(handler)
-		} else {
-			testMod.probeHandler = nil
-			testMod.probe.SetEventHandler(testMod.module)
-		}
-	}()
-
 	var logLevel seelog.LogLevel = seelog.InfoLvl
 	if testing.Verbose() {
 		logLevel = seelog.TraceLvl
@@ -311,6 +290,10 @@ func newTestModule(macros []*rules.MacroDefinition, rules []*rules.RuleDefinitio
 		probe:      mod.(*module.Module).GetProbe(),
 		events:     make(chan testEvent, eventChanLength),
 		discarders: make(chan *testDiscarder, discarderChanLength),
+		probeHandler: &testEventHandler{
+			events:       make(chan *sprobe.Event, 16384),
+			customEvents: make(chan *module.RuleEvent, 16384),
+		},
 	}
 
 	if err := mod.Register(nil); err != nil {
@@ -319,6 +302,8 @@ func newTestModule(macros []*rules.MacroDefinition, rules []*rules.RuleDefinitio
 
 	rs := mod.(*module.Module).GetRuleSet()
 	rs.AddListener(testMod)
+
+	testMod.probe.SetEventHandler(testMod.probeHandler)
 
 	return testMod, nil
 }
@@ -381,6 +366,29 @@ func (tm *testModule) GetEvent() (*sprobe.Event, *eval.Rule, error) {
 			return nil, nil, errors.New("invalid event")
 		case <-timeout:
 			return nil, nil, errors.New("timeout")
+		}
+	}
+}
+
+func (tm *testModule) GetProbeCustomEvent(timeout time.Duration, eventType ...eval.EventType) (*module.RuleEvent, error) {
+	if tm.probeHandler == nil {
+		return nil, errors.New("could not get the probe events without using the `wantoProbeEvents` test option")
+	}
+
+	t := time.After(timeout)
+
+	for {
+		select {
+		case ruleEvent := <-tm.probeHandler.customEvents:
+			if len(eventType) > 0 {
+				if ruleEvent.Event.GetType() == eventType[0] {
+					return ruleEvent, nil
+				}
+			} else {
+				return ruleEvent, nil
+			}
+		case <-t:
+			return nil, errors.New("timeout")
 		}
 	}
 }
