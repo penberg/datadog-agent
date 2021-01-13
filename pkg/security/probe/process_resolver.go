@@ -235,12 +235,12 @@ func (p *ProcessResolver) insertEntry(pid uint32, entry *ProcessCacheEntry) *Pro
 			// update lineage
 			parent.Children[entry.Pid] = entry
 			p.entryCache[entry.PPid] = parent
-			_ = p.client.Count(MetricPrefix+".process_resolver.added", 1, []string{}, 1.0)
+			_ = p.client.Count(MetricProcessResolverAdded, 1, []string{}, 1.0)
 		}
 	}
 	entry.Parent = parent
 	if _, ok := p.entryCache[pid]; !ok {
-		_ = p.client.Count(MetricPrefix+".process_resolver.added", 1, []string{}, 1.0)
+		_ = p.client.Count(MetricProcessResolverAdded, 1, []string{}, 1.0)
 	}
 	p.entryCache[pid] = entry
 
@@ -280,7 +280,7 @@ func (p *ProcessResolver) recursiveDelete(entry *ProcessCacheEntry) {
 	}
 
 	// Delete the entry
-	_ = p.client.Count(MetricPrefix+".process_resolver.deleted", 1, []string{}, 1.0)
+	_ = p.client.Count(MetricProcessResolverDeleted, 1, []string{}, 1.0)
 	delete(p.entryCache, entry.Pid)
 
 	// There is nothing left to do if the entry does not have a parent
@@ -302,7 +302,7 @@ func (p *ProcessResolver) Resolve(pid uint32, cookie uint32) *ProcessCacheEntry 
 
 	entry, exists := p.entryCache[pid]
 	if exists {
-		_ = p.client.Count(MetricPrefix+".process_resolver.hits", 1, []string{"type:cache"}, 1.0)
+		_ = p.client.Count(MetricProcessResolverCacheHits, 1, []string{"type:cache"}, 1.0)
 		return entry
 	}
 
@@ -316,17 +316,17 @@ func (p *ProcessResolver) Resolve(pid uint32, cookie uint32) *ProcessCacheEntry 
 
 	// fallback to the kernel maps directly, the perf event may be delayed / may have been lost
 	if entry = p.resolveWithKernelMaps(pid); entry != nil {
-		_ = p.client.Count(MetricPrefix+".process_resolver.hits", 1, []string{"type:kernel_maps"}, 1.0)
+		_ = p.client.Count(MetricProcessResolverCacheHits, 1, []string{"type:kernel_maps"}, 1.0)
 		return entry
 	}
 
 	// fallback to /proc, the in-kernel LRU may have deleted the entry
 	if entry = p.resolveWithProcfs(pid); entry != nil {
-		_ = p.client.Count(MetricPrefix+".process_resolver.hits", 1, []string{"type:procfs"}, 1.0)
+		_ = p.client.Count(MetricProcessResolverCacheHits, 1, []string{"type:procfs"}, 1.0)
 		return entry
 	}
 
-	_ = p.client.Count(MetricPrefix+".process_resolver.cache_miss", 1, []string{}, 1.0)
+	_ = p.client.Count(MetricProcessResolverCacheMiss, 1, []string{}, 1.0)
 	return nil
 }
 
