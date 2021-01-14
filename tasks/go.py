@@ -3,7 +3,6 @@ Golang related tasks go here
 """
 from __future__ import print_function
 
-import csv
 import datetime
 import os
 import shutil
@@ -12,9 +11,8 @@ import sys
 from invoke import task
 from invoke.exceptions import Exit
 
-from .bootstrap import get_deps, process_deps
 from .build_tags import get_default_build_tags
-from .utils import get_build_flags, get_gopath
+from .utils import get_build_flags
 
 # We use `basestring` in the code for compat with python2 unicode strings.
 # This makes the same code work in python3 as well.
@@ -270,37 +268,11 @@ def misspell(ctx, targets):
 
 @task
 def deps(
-    ctx, verbose=False, android=False, no_bootstrap=False, no_dep_ensure=False,
+    ctx, verbose=False, android=False, no_dep_ensure=False,
 ):
     """
     Setup Go dependencies
     """
-    if not no_bootstrap:
-        deps = get_deps('deps')
-        order = deps.get("order", deps.keys())
-        for dependency in order:
-            tool = deps.get(dependency)
-            if not tool:
-                print("Malformed bootstrap JSON, dependency {} not found".format(dependency))
-                raise Exit(code=1)
-            print("processing checkout tool {}".format(dependency))
-            process_deps(ctx, dependency, tool.get('version'), tool.get('type'), 'checkout', verbose=verbose)
-
-        order = deps.get("order", deps.keys())
-        for dependency in order:
-            tool = deps.get(dependency)
-            if tool.get('install', True):
-                print("processing get tool {}".format(dependency))
-                process_deps(
-                    ctx,
-                    dependency,
-                    tool.get('version'),
-                    tool.get('type'),
-                    'install',
-                    cmd=tool.get('cmd'),
-                    verbose=verbose,
-                )
-
     if android:
         ndkhome = os.environ.get('ANDROID_NDK_HOME')
         if not ndkhome:
@@ -318,7 +290,9 @@ def deps(
         verbosity = ' -v' if verbose else ''
         ctx.run("go mod vendor{}".format(verbosity))
         # use modvendor to copy missing files dependencies
-        ctx.run('{}/bin/modvendor -copy="**/*.c **/*.h **/*.proto"{}'.format(get_gopath(ctx), verbosity))
+        # ctx.run(
+        #    'go run github.com/goware/modvendor -copy="**/*.c **/*.h **/*.proto"{}'.format(get_gopath(ctx), verbosity)
+        # )
         dep_done = datetime.datetime.now()
 
         # If github.com/DataDog/datadog-agent gets vendored too - nuke it
@@ -346,7 +320,6 @@ def deps(
             print("Removing vendored golang.org/x/mobile")
             shutil.rmtree('vendor/golang.org/x/mobile')
 
-    if not no_dep_ensure:
         print("go mod vendor, elapsed: {}".format(dep_done - start))
 
 
@@ -409,9 +382,8 @@ def generate_licenses(ctx, filename='LICENSE-3rdparty.csv', verbose=False):
 
 
 def get_licenses_list(ctx):
-    result = ctx.run('{}/bin/wwhrd list --no-color'.format(get_gopath(ctx)), hide='err')
+    result = ctx.run('go run github.com/frapposelli/wwhrd list --no-color', hide='err')
     licenses = []
-    licenses.append('core,"github.com/frapposelli/wwhrd",MIT')
     if result.stderr:
         for line in result.stderr.split("\n"):
             index = line.find('msg="Found License"')
@@ -427,44 +399,6 @@ def get_licenses_list(ctx):
                     licenses.append("core,{},{}".format(package, license))
     licenses.sort()
     return licenses
-
-
-@task
-def lint_licenses_old(ctx):
-    # non-go deps that should be listed in the license file, but not in go.sum
-    NON_GO_DEPS = set(
-        ['github.com/codemirror/CodeMirror', 'github.com/FortAwesome/Font-Awesome', 'github.com/jquery/jquery',]
-    )
-
-    # Read all dep names from go.sum
-    go_deps = set()
-    with open('go.sum') as f:
-        for line in f:
-            gopkg = line.split(" ")
-            if len(gopkg) != 3:
-                continue
-            go_deps.add(gopkg[0])
-
-    deps = go_deps | NON_GO_DEPS
-
-    # Read all dep names listed in LICENSE-3rdparty
-    licenses = csv.DictReader(open('LICENSE-3rdparty.csv'))
-    license_deps = set()
-    for entry in licenses:
-        if len(entry['License']) == 0:
-            raise Exit(message="LICENSE-3rdparty entry '{}' has an empty license".format(entry['Origin']), code=1)
-        entrysplit = entry['Origin'].split("/")
-        entrysplit = entrysplit[0:3]
-        print('/'.join(entrysplit))
-        license_deps.add('/'.join(entrysplit))
-
-    if deps != license_deps:
-        raise Exit(
-            message="LICENSE-3rdparty.csv is outdated compared to deps listed in go.sum:\n"
-            + "missing from LICENSE-3rdparty.csv: {}\n".format(deps - license_deps)
-            + "listed in LICENSE-3rdparty.csv but not in go.sum: {}".format(license_deps - deps),
-            code=1,
-        )
 
 
 @task

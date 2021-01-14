@@ -15,8 +15,6 @@
     - source /root/.bashrc && conda activate $CONDA_ENV
     - python3 -m pip install wheel
     - python3 -m pip install -r requirements.txt
-    - GO111MODULE=off go get gopkg.in/yaml.v2
-    - GO111MODULE=off go get github.com/stretchr/testify
     - inv -e rtloader.make --install-prefix=$SRC_PATH/dev --python-runtimes "$PYTHON_RUNTIMES"
     - inv -e rtloader.install
     - inv -e rtloader.format --raise-if-changed
@@ -27,10 +25,12 @@ tests_deb-x64-py2:
   stage: source_test
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-buildimages/deb_x64:$DATADOG_AGENT_BUILDIMAGES
   tags: ["runner:main", "size:2xlarge"]
+  needs: ["linux_x64_go_deps"]
   variables:
     PYTHON_RUNTIMES: '2'
     CONDA_ENV: ddpy2
   script:
+    - *retrieve_linux_go_deps
     - inv -e test --race --profile --python-runtimes "$PYTHON_RUNTIMES" --cpus 4
 
 tests_deb-x64-py3:
@@ -38,10 +38,12 @@ tests_deb-x64-py3:
   stage: source_test
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-buildimages/deb_x64:$DATADOG_AGENT_BUILDIMAGES
   tags: ["runner:main", "size:2xlarge"]
+  needs: ["linux_x64_go_deps"]
   variables:
     PYTHON_RUNTIMES: '3'
     CONDA_ENV: ddpy3
   script:
+    - *retrieve_linux_go_deps
     - inv -e test --race --profile --python-runtimes "$PYTHON_RUNTIMES" --cpus 4
 
 tests_rpm-x64-py2:
@@ -49,10 +51,12 @@ tests_rpm-x64-py2:
   stage: source_test
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-buildimages/rpm_x64:$DATADOG_AGENT_BUILDIMAGES
   tags: ["runner:main", "size:2xlarge"]
+  needs: ["linux_x64_go_deps"]
   variables:
     PYTHON_RUNTIMES: '2'
     CONDA_ENV: ddpy2
   script:
+    - *retrieve_linux_go_deps
     # Exclude systemd because it cannot succeed on Centos 6: the image doesn't have the shared object required by
     # https://github.com/coreos/go-systemd/blob/c8cc474ba8655dfbdb0ac7fcc09b7faf5b643caf/sdjournal/functions.go#L46
     # This is OK because the test on systemd still runs on the debian image above
@@ -63,10 +67,12 @@ tests_rpm-x64-py3:
   stage: source_test
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/datadog-agent-buildimages/rpm_x64:$DATADOG_AGENT_BUILDIMAGES
   tags: ["runner:main", "size:2xlarge"]
+  needs: ["linux_x64_go_deps"]
   variables:
     PYTHON_RUNTIMES: '3'
     CONDA_ENV: ddpy3
   script:
+    - *retrieve_linux_go_deps
     # Exclude systemd because it cannot succeed on Centos 6: the image doesn't have the shared object required by
     # https://github.com/coreos/go-systemd/blob/c8cc474ba8655dfbdb0ac7fcc09b7faf5b643caf/sdjournal/functions.go#L46
     # This is OK because the test on systemd still runs on the debian image above
