@@ -17,7 +17,7 @@ import (
 // Reporter defines an interface for reporting rule events
 type Reporter interface {
 	Report(event *Event)
-	ReportRaw(content []byte)
+	ReportRaw(content []byte, tags ...string)
 }
 
 type reporter struct {
@@ -42,7 +42,8 @@ func (r *reporter) Report(event *Event) {
 	r.ReportRaw(buf)
 }
 
-func (r *reporter) ReportRaw(content []byte) {
-	msg := message.NewMessageWithSource(content, message.StatusInfo, r.logSource, time.Now().UnixNano())
+func (r *reporter) ReportRaw(content []byte, tags ...string) {
+	origin := message.NewOrigin(r.logSource, tags...)
+	msg := message.NewMessage(content, origin, message.StatusInfo, time.Now().UnixNano())
 	r.logChan <- msg
 }
