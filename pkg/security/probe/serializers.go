@@ -111,6 +111,7 @@ type EventSerializer struct {
 	UserContextSerializer      UserContextSerializer       `json:"usr"`
 	ProcessContextSerializer   *ProcessContextSerializer   `json:"process"`
 	ContainerContextSerializer *ContainerContextSerializer `json:"container,omitempty"`
+	Date                       time.Time                   `json:"date"`
 }
 
 func newFileSerializer(fe *FileEvent, e *Event) *FileSerializer {
@@ -152,11 +153,11 @@ func getTimeIfNotZero(t time.Time) *time.Time {
 	return &t
 }
 
-func newProcessCacheEntrySerializer(pce *ProcessCacheEntry, e *Event, useEvent bool) *ProcessCacheEntrySerializer {
+func newProcessCacheEntrySerializer(pce *ProcessCacheEntry, e *Event, r *Resolvers, useEvent bool) *ProcessCacheEntrySerializer {
 	var pid, ppid, tid, uid, gid uint32
 	var user, group string
 
-	if useEvent {
+	if useEvent && e != nil {
 		pid = e.Process.Pid
 		ppid = e.Process.PPid
 		tid = e.Process.Tid
@@ -170,8 +171,8 @@ func newProcessCacheEntrySerializer(pce *ProcessCacheEntry, e *Event, useEvent b
 		tid = pce.Tid
 		uid = pce.UID
 		gid = pce.GID
-		user = pce.ResolveUser(e)
-		group = pce.ResolveGroup(e)
+		user = pce.ResolveUserWithResolvers(r)
+		group = pce.ResolveGroupWithResolvers(r)
 	}
 
 	return &ProcessCacheEntrySerializer{
@@ -185,7 +186,7 @@ func newProcessCacheEntrySerializer(pce *ProcessCacheEntry, e *Event, useEvent b
 		UID:                 uid,
 		GID:                 gid,
 		Name:                pce.Comm,
-		Path:                pce.ResolveInode(e),
+		Path:                pce.ResolveInodeWithResolvers(r),
 		PathResolutionError: pce.GetPathResolutionError(),
 		Inode:               pce.Inode,
 		MountID:             pce.MountID,
@@ -202,16 +203,14 @@ func newContainerContextSerializer(cc *ContainerContext, e *Event) *ContainerCon
 	}
 }
 
-func newProcessContextSerializer(pc *ProcessContext, e *Event) *ProcessContextSerializer {
-	entry := e.ResolveProcessCacheEntry()
-
+func newProcessContextSerializer(entry *ProcessCacheEntry, e *Event, r *Resolvers) *ProcessContextSerializer {
 	ps := &ProcessContextSerializer{
-		ProcessCacheEntrySerializer: newProcessCacheEntrySerializer(entry, e, true),
+		ProcessCacheEntrySerializer: newProcessCacheEntrySerializer(entry, e, r, true),
 	}
 
 	ancestor := entry.Parent
 	for i := 0; ancestor != nil && len(ancestor.PathnameStr) > 0; i++ {
-		s := newProcessCacheEntrySerializer(ancestor, e, false)
+		s := newProcessCacheEntrySerializer(ancestor, e, r, false)
 		ps.Ancestors = append(ps.Ancestors, s)
 		if i == 0 {
 			ps.Parent = s
@@ -233,13 +232,14 @@ func serializeSyscallRetval(retval int64) string {
 	}
 }
 
-func newEventSerializer(event *Event) (*EventSerializer, error) {
+func newEventSerializer(event *Event) *EventSerializer {
 	s := &EventSerializer{
 		EventContextSerializer: &EventContextSerializer{
 			Name:     EventType(event.Type).String(),
 			Category: FIMCategory,
 		},
-		ProcessContextSerializer: newProcessContextSerializer(&event.Process, event),
+		ProcessContextSerializer: newProcessContextSerializer(event.ResolveProcessCacheEntry(), event, event.resolvers),
+		Date: event.ResolveEventTimestamp(),
 	}
 
 	if event.Container.ID != "" {
@@ -356,5 +356,5 @@ func newEventSerializer(event *Event) (*EventSerializer, error) {
 		s.Category = ProcessActivity
 	}
 
-	return s, nil
+	return s
 }

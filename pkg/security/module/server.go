@@ -82,7 +82,7 @@ type RuleEvent struct {
 func (e *EventServer) SendEvent(rule *rules.Rule, event Event) {
 	agentContext := &AgentContext{
 		RuleID: rule.Definition.ID,
-		Tags:   append(rule.Tags, "rule_id:"+rule.Definition.ID),
+		Tags:   append(rule.Tags, append(event.GetTags(), "rule_id:"+rule.Definition.ID)...),
 	}
 
 	ruleEvent := &Signal{

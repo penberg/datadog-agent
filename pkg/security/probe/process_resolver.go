@@ -480,38 +480,10 @@ func (p *ProcessResolver) MarkCookieAsBestEffort(cookie uint32) {
 		return
 	}
 
-	var pid, toDelete uint32
-	// 32 is the size of pid_cache_t
-	var entry [32]byte
-	var mapCookie uint32
-
 	// mark cookie as best effort
 	if err := p.bestEffortCookiesMap.Put(&cookie, ebpf.BytesMapItem([]byte{1})); err != nil {
+		log.Tracef("failed to mark cookie %d as best effort", cookie)
 		return
-	}
-
-	iter := p.pidCacheMap.Iterate()
-	for iter.Next(&pid, &entry) {
-		// Next must be called before a key is deleted otherwise the iteration will restart from the beginning
-		// after every delete. Defer deletion to the next iteration by setting the pid in toDelete.
-		if toDelete > 0 {
-			_ = p.pidCacheMap.Delete(&toDelete)
-			toDelete = 0
-		}
-
-		// check if the cookies match
-		mapCookie = ebpf.ByteOrder.Uint32(entry[0:4])
-		if mapCookie == cookie {
-
-			// move entry to the best effort map
-			_ = p.bestEffortPidCacheMap.Put(&pid, &entry)
-
-			// delete entry in the normal pid cache map
-			toDelete = pid
-		}
-	}
-	if toDelete > 0 {
-		_ = p.pidCacheMap.Delete(&toDelete)
 	}
 }
 

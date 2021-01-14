@@ -114,7 +114,7 @@ func (m *Monitor) ProcessEvent(event *Event, size uint64, CPU int, perfMap *mana
 	// Look for an unresolved path
 	if err := event.GetPathResolutionError(); err != nil {
 		m.probe.DispatchCustomEvent(
-			NewAbnormalPathEvent(event, time.Now(), err),
+			NewAbnormalPathEvent(event, err),
 		)
 	}
 }

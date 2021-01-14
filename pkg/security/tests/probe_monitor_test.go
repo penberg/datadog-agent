@@ -58,12 +58,12 @@ func TestProbeMonitor(t *testing.T) {
 		}
 		defer test.Close()
 
-		ruleEvent, err := test.GetProbeCustomEvent(1*time.Second, probe.RuleSetLoadedRuleID)
+		ruleEvent, err := test.GetProbeCustomEvent(1*time.Second, probe.CustomRulesetLoadedEventType.String())
 		if err != nil {
 			t.Error(err)
 		} else {
-			if ruleEvent.RuleID != probe.RuleSetLoadedRuleID {
-				t.Errorf("expected %s rule, got %s", probe.RuleSetLoadedRuleID, ruleEvent.RuleID)
+			if ruleEvent.RuleID != probe.RulesetLoadedRuleID {
+				t.Errorf("expected %s rule, got %s", probe.RulesetLoadedRuleID, ruleEvent.RuleID)
 			}
 		}
 	})
@@ -79,7 +79,7 @@ func TestProbeMonitor(t *testing.T) {
 		defer os.Remove(truncatedSegmentFile)
 		defer syscall.Close(int(fd))
 
-		ruleEvent, err := test.GetProbeCustomEvent(3*time.Second, probe.ErrTruncatedSegment{}.Error())
+		ruleEvent, err := test.GetProbeCustomEvent(3*time.Second, probe.CustomTruncatedSegmentEventType.String())
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -100,7 +100,7 @@ func TestProbeMonitor(t *testing.T) {
 		defer os.Remove(truncatedParentsFile)
 		defer syscall.Close(int(fd))
 
-		ruleEvent, err := test.GetProbeCustomEvent(3*time.Second, probe.ErrTruncatedParents{}.Error())
+		ruleEvent, err := test.GetProbeCustomEvent(3*time.Second, probe.CustomTruncatedParentsEventType.String())
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -135,7 +135,7 @@ func TestProbeMonitor(t *testing.T) {
 			}
 		}()
 
-		ruleEvent, err := test.GetProbeCustomEvent(3*time.Second, probe.ForkBombRuleID)
+		ruleEvent, err := test.GetProbeCustomEvent(3*time.Second, probe.CustomForkBombEventType.String())
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -184,7 +184,7 @@ func TestNoisyProcess(t *testing.T) {
 			_ = os.Remove(file)
 		}
 
-		ruleEvent, err := test.GetProbeCustomEvent(1*time.Second, probe.NoisyProcessRuleID)
+		ruleEvent, err := test.GetProbeCustomEvent(1*time.Second, probe.CustomNoisyProcessEventType.String())
 		if err != nil {
 			t.Error(err)
 		} else {
